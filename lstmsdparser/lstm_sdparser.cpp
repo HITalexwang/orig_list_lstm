@@ -164,6 +164,7 @@ bool LSTMParser::has_path_to(int w1, int w2, const vector<vector<string>>& graph
         int b0 = bufferi.back();
         int root_num = 0;
         int s0_head_num = 0;
+        int b0_head_num = 0;
         for (int i = 0; i < (int)dir_graph[root].size(); ++i)
             if (dir_graph[root][i] != REL_NULL)
                 root_num ++;
@@ -171,6 +172,10 @@ bool LSTMParser::has_path_to(int w1, int w2, const vector<vector<string>>& graph
             for (int i = 0; i < (int)dir_graph[root].size(); ++i)
                 if (dir_graph[i][s0] != REL_NULL)
                     s0_head_num ++;
+        if (b0 >= 0)
+            for (int i = 0; i < (int)dir_graph[root].size(); ++i)
+                if (dir_graph[i][b0] != REL_NULL)
+                    b0_head_num ++;
         if (a[0] == 'L'){
             string rel = a.substr(3, a.size() - 4);
             if (bsize < 2 || ssize < 2) return true;
@@ -179,11 +184,13 @@ bool LSTMParser::has_path_to(int w1, int w2, const vector<vector<string>>& graph
             //if (b0 == root && rel == "Root" && root_num >= 1) return true;
             if (b0 == (int)root && !(rel == "Root" && root_num == 0 && s0_head_num == 0)) return true;
             if (b0 != (int)root && rel == "Root") return true;
+            if (s0_head_num >= 1) return true; // add for original list-based
         }
         if (a[0] == 'R'){
             if (bsize < 2 || ssize < 2) return true;
             if (has_path_to(b0, s0, dir_graph)) return true;
             if (b0 == (int)root) return true;
+            if (b0_head_num >= 1) return true; // add for original list-based
         }
         if (a[0] == 'N'){
             if (a[1] == 'S' && bsize < 2) return true;
