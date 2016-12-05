@@ -1066,19 +1066,21 @@ void LSTMParser::train(const std::string fname, const unsigned unk_strategy,
              random_shuffle(order.begin(), order.end());
            }
            tot_seen += 1;
-           const std::vector<unsigned>& sentence=corpus.sentences[order[si]];
-           std::vector<unsigned> tsentence=sentence;
+           //const std::vector<unsigned>& sentence=corpus.sentences[order[si]];
+           std::vector<unsigned> tsentence = corpus.sentences[order[si]];
            if (unk_strategy == 1) {
              for (auto& w : tsentence)
                if (singletons.count(w) && cnn::rand01() < unk_prob) w = kUNK;
            }
-     const std::vector<unsigned>& sentencePos=corpus.sentencesPos[order[si]]; 
-     const std::vector<unsigned>& actions=corpus.correct_act_sent[order[si]];
+     		//const std::vector<unsigned>& sentencePos=corpus.sentencesPos[order[si]]; 
+     		//const std::vector<unsigned>& actions=corpus.correct_act_sent[order[si]];
            ComputationGraph hg;
            //cerr << "Start word:" << corpus.intToWords[sentence[0]]<<corpus.intToWords[sentence[1]] << endl;
            std::vector<std::vector<string>> cand;
 
-           log_prob_parser(&hg,sentence,tsentence,sentencePos,actions,&right,cand);
+           //log_prob_parser(&hg,sentence,tsentence,sentencePos,actions,&right,cand);
+           log_prob_parser(&hg,corpus.sentences[order[si]], tsentence, corpus.sentencesPos[order[si]], 
+           					corpus.correct_act_sent[order[si]], &right, cand);
            double lp = as_scalar(hg.incremental_forward());
            if (lp < 0) {
              cerr << "Log prob < 0 on sentence " << order[si] << ": lp=" << lp << endl;
@@ -1088,7 +1090,8 @@ void LSTMParser::train(const std::string fname, const unsigned unk_strategy,
            sgd.update(1.0);
            llh += lp;
            ++si;
-           trs += actions.size();
+           //trs += actions.size();
+           trs += corpus.correct_act_sent[order[si]].size();
       }
       sgd.status();
       //time_t time_now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
@@ -1110,22 +1113,24 @@ void LSTMParser::train(const std::string fname, const unsigned unk_strategy,
         auto t_start = std::chrono::high_resolution_clock::now();
         std::vector<std::vector<std::vector<string>>> refs, hyps;
         for (unsigned sii = 0; sii < dev_size; ++sii) {
-           const std::vector<unsigned>& sentence=corpus.sentencesDev[sii];
-     const std::vector<unsigned>& sentencePos=corpus.sentencesPosDev[sii]; 
-     const std::vector<unsigned>& actions=corpus.correct_act_sentDev[sii];
-           std::vector<unsigned> tsentence=sentence;
+           	//const std::vector<unsigned>& sentence=corpus.sentencesDev[sii];
+     		//const std::vector<unsigned>& sentencePos=corpus.sentencesPosDev[sii]; 
+     		//const std::vector<unsigned>& actions=corpus.correct_act_sentDev[sii];
+           std::vector<unsigned> tsentence = corpus.sentencesDev[sii];
            for (auto& w : tsentence)
              if (training_vocab.count(w) == 0) w = kUNK;
 
            ComputationGraph hg;
            std::vector<std::vector<string>> cand;
-            std::vector<unsigned> pred = log_prob_parser(&hg,sentence,tsentence,sentencePos,std::vector<unsigned>(),&right,cand);
+            //std::vector<unsigned> pred = log_prob_parser(&hg,sentence,tsentence,sentencePos,std::vector<unsigned>(),&right,cand);
+            std::vector<unsigned> pred = log_prob_parser(&hg, corpus.sentencesDev[sii], tsentence, 
+            								corpus.sentencesPosDev[sii], std::vector<unsigned>(),&right,cand);
            double lp = 0;
            llh -= lp;
-           trs += actions.size();
+           trs += corpus.correct_act_sentDev[sii].size();
            //cerr << "start word:" << sii << corpus.intToWords[sentence[0]] << corpus.intToWords[sentence[1]] << endl;
-           std::vector<std::vector<string>> ref = compute_heads(sentence, actions);
-           std::vector<std::vector<string>> hyp = compute_heads(sentence, pred);
+           std::vector<std::vector<string>> ref = compute_heads(corpus.sentencesDev[sii], corpus.correct_act_sentDev[sii]);
+           std::vector<std::vector<string>> hyp = compute_heads(corpus.sentencesDev[sii], pred);
            //output_conll(sentence, corpus.intToWords, ref, hyp);
            //correct_heads += compute_correct(ref, hyp, sentence.size() - 1);
            //total_heads += sentence.size() - 1;
@@ -1344,7 +1349,7 @@ void LSTMParser::output_conll(const vector<unsigned>& sentence, const vector<uns
 
 map<string, double> LSTMParser::evaluate(const vector<vector<vector<string>>>& refs, const vector<vector<vector<string>>>& hyps) {
 
-    std::map<int, std::vector<unsigned>>& sentencesPos = corpus.sentencesPosDev;
+    //std::map<int, std::vector<unsigned>>& sentencesPos = corpus.sentencesPosDev;
     const unsigned punc = corpus.posToInt["PU"];
     assert(refs.size() == hyps.size());
     int correct_arcs = 0; // unlabeled
@@ -1372,7 +1377,7 @@ map<string, double> LSTMParser::evaluate(const vector<vector<vector<string>>>& r
     //int sum_non_local_gold_arcs = 0;
     //int sum_non_local_pred_arcs = 0;
     for (int i = 0; i < (int)refs.size(); ++i){
-        vector<unsigned> sentPos = sentencesPos[i];
+        vector<unsigned> sentPos = corpus.sentencesPosDev[i];
         unsigned sent_len = refs[i].size();
         assert(sentPos.size() == sent_len);
         correct_labeled_flag_wo_punc = true;
