@@ -236,7 +236,8 @@ bool LSTMParser::has_path_to(int w1, int w2, const vector<vector<string>>& graph
     return false;
 }
 
-vector<vector<string>> LSTMParser::compute_heads(const vector<unsigned>& sent, const vector<unsigned>& actions) {
+vector<vector<string>> LSTMParser::compute_heads(const vector<unsigned>& sent, const vector<unsigned>& actions,
+                                                  const std::vector<string>& setOfActions) {
   //map<int,int> heads;
   //map<int,string> r;
   //map<int,string>& rels = (pr ? *pr : r);
@@ -255,7 +256,7 @@ vector<vector<string>> LSTMParser::compute_heads(const vector<unsigned>& sent, c
         bufferi[sent_len - i] = i;
     bufferi[0] = -999;
     for (auto action: actions) { // loop over transitions for sentence
-        const string& actionString=corpus.actions[action];
+        const string& actionString=setOfActions[action];
         const char ac = actionString[0];
         const char ac2 = actionString[1];
 
@@ -379,8 +380,8 @@ vector<unsigned> LSTMParser::log_prob_parser(ComputationGraph* hg,
                      const vector<unsigned>& sent,  // sent with oovs replaced
                      const vector<unsigned>& sentPos,
                      const vector<unsigned>& correct_actions,
-                     //const vector<string>& setOfActions,
-                     //const map<unsigned, std::string>& intToWords,
+                     const vector<string>& setOfActions,
+                     const map<unsigned, std::string>& intToWords,
                      double *right, 
                      vector<vector<string>>& cand,
                      vector<Expression>* word_rep,
@@ -498,20 +499,20 @@ vector<unsigned> LSTMParser::log_prob_parser(ComputationGraph* hg,
       cerr << sent.size() << endl;
       cerr <<endl<<"[";
       for (int i = (int)stacki.size() - 1; i > -1 ; --i)
-        cerr << corpus.intToWords[sent[stacki[i]]] <<"-"<<stacki[i]<<", ";
+        cerr << intToWords[sent[stacki[i]]] <<"-"<<stacki[i]<<", ";
       cerr <<"][";
       for (int i = (int)passi.size() - 1; i > -1 ; --i)
-        cerr << corpus.intToWords[sent[passi[i]]]<<"-"<<passi[i]<<", ";
+        cerr << intToWords[sent[passi[i]]]<<"-"<<passi[i]<<", ";
       cerr <<"][";
       for (int i = (int)bufferi.size() - 1; i > -1 ; --i)
-        cerr << corpus.intToWords[sent[bufferi[i]]]<<"-"<<bufferi[i]<<", ";
+        cerr << intToWords[sent[bufferi[i]]]<<"-"<<bufferi[i]<<", ";
       cerr <<"]"<<endl;
         //}*/
       for (auto a: possible_actions) {
-        //cerr << " " << corpus.actions[a]<< " ";
-        if (IsActionForbidden(corpus.actions[a], buffer.size(), stack.size(), sent.size() - 1, dir_graph, stacki, bufferi))
+        //cerr << " " << setOfActions[a]<< " ";
+        if (IsActionForbidden(setOfActions[a], buffer.size(), stack.size(), sent.size() - 1, dir_graph, stacki, bufferi))
           continue;
-        //cerr << " <" << corpus.actions[a] << "> ";
+        //cerr << " <" << setOfActions[a] << "> ";
         current_valid_actions.push_back(a);
       }
       // p_t = pbias + S * slstm + P * plstm + B * blstm + A * almst
@@ -538,11 +539,11 @@ vector<unsigned> LSTMParser::log_prob_parser(ComputationGraph* hg,
         action = correct_actions[action_count];
         if (best_a == action) { (*right)++; }
       }
-      if (corpus.actions[action] == "NS"){
+      if (setOfActions[action] == "NS"){
         double second_score = - DBL_MAX;
-        string second_a = corpus.actions[current_valid_actions[0]];
+        string second_a = setOfActions[current_valid_actions[0]];
         for (unsigned i = 1; i < current_valid_actions.size(); ++i) {
-            const string& actionstr=corpus.actions[current_valid_actions[i]];
+            const string& actionstr=setOfActions[current_valid_actions[i]];
             const char  ac0 = actionstr[0];
             //cerr << actionstr << "-" << adist[current_valid_actions[i]] << endl;
             if (adist[current_valid_actions[i]] > second_score &&
@@ -559,7 +560,7 @@ vector<unsigned> LSTMParser::log_prob_parser(ComputationGraph* hg,
         }
       }
       /*if (!build_training_graph)
-        cerr <<endl<< "gold action: " << corpus.actions[action] <<endl;*/
+        cerr <<endl<< "gold action: " << setOfActions[action] <<endl;*/
       ++action_count;
       log_probs.push_back(pick(adiste, action));
       results.push_back(action);
@@ -572,7 +573,7 @@ vector<unsigned> LSTMParser::log_prob_parser(ComputationGraph* hg,
       Expression relation = lookup(*hg, p_r, action);
 
       // do action
-      const string& actionString=corpus.actions[action];
+      const string& actionString=setOfActions[action];
       const char ac = actionString[0];
       const char ac2 = actionString[1];
 
@@ -623,7 +624,7 @@ vector<unsigned> LSTMParser::log_prob_parser(ComputationGraph* hg,
                 bufferi.pop_back();
                 //dir_graph[headi][depi] = true; // add this arc to graph
                 dir_graph[headi][depi] = REL_EXIST;
-                if (headi == sent.size() - 1) rootword = corpus.intToWords.find(sent[depi])->second;
+                if (headi == sent.size() - 1) rootword = intToWords.find(sent[depi])->second;
                 Expression composed = affine_transform({cbias, H, head, D, dep, R, relation});
                 Expression nlcomposed = tanh(composed);
                 stack_lstm.rewind_one_step();
@@ -655,7 +656,7 @@ vector<unsigned> LSTMParser::log_prob_parser(ComputationGraph* hg,
                 stacki.pop_back();
                 //dir_graph[headi][depi] = true; // add this arc to graph
                 dir_graph[headi][depi] = REL_EXIST;
-                if (headi == sent.size() - 1) rootword = corpus.intToWords.find(sent[depi])->second;
+                if (headi == sent.size() - 1) rootword = intToWords.find(sent[depi])->second;
                 Expression composed = affine_transform({cbias, H, head, D, dep, R, relation});
                 Expression nlcomposed = tanh(composed);
 
@@ -729,7 +730,7 @@ vector<unsigned> LSTMParser::log_prob_parser(ComputationGraph* hg,
                 bufferi.pop_back();
                 //dir_graph[headi][depi] = true; // add this arc to graph
                 dir_graph[headi][depi] = REL_EXIST;
-                if (headi == sent.size() - 1) rootword = corpus.intToWords.find(sent[depi])->second;
+                if (headi == sent.size() - 1) rootword = intToWords.find(sent[depi])->second;
                 Expression composed = affine_transform({cbias, H, head, D, dep, R, relation});
                 Expression nlcomposed = tanh(composed);
                 stack_lstm.rewind_one_step();
@@ -761,7 +762,7 @@ vector<unsigned> LSTMParser::log_prob_parser(ComputationGraph* hg,
                 stacki.pop_back();
                 //dir_graph[headi][depi] = true; // add this arc to graph
                 dir_graph[headi][depi] = REL_EXIST;
-                if (headi == sent.size() - 1) rootword = corpus.intToWords.find(sent[depi])->second;
+                if (headi == sent.size() - 1) rootword = intToWords.find(sent[depi])->second;
                 Expression composed = affine_transform({cbias, H, head, D, dep, R, relation});
                 Expression nlcomposed = tanh(composed);
 
@@ -793,7 +794,7 @@ vector<unsigned> LSTMParser::log_prob_parser(ComputationGraph* hg,
   }
 
   void LSTMParser::process_headless_search_all(const vector<unsigned>& sent, const vector<unsigned>& sentPos, 
-                                                        vector<Expression>& word_rep, 
+                                                        const std::vector<string>& setOfActions, vector<Expression>& word_rep, 
                                                         Expression& act_rep, int n, int sent_len, int dir, map<int, double>* scores, 
                                                         map<int, string>* rels){
         for (int i = n + dir; i >= 0 && i < sent_len; i += dir){
@@ -802,7 +803,7 @@ vector<unsigned> LSTMParser::log_prob_parser(ComputationGraph* hg,
             double score;
             string rel;
             ComputationGraph cg;
-            get_best_label(sent, sentPos, &cg, s0, b0, word_rep , act_rep, sent_len, dir, &score, &rel);
+            get_best_label(sent, sentPos, &cg, setOfActions, s0, b0, word_rep , act_rep, sent_len, dir, &score, &rel);
             (*scores)[i] = score;
             (*rels)[i] = rel;
             //cerr << "search all n: " << n << " i: " << i << "rel: " << rel << endl;
@@ -810,7 +811,8 @@ vector<unsigned> LSTMParser::log_prob_parser(ComputationGraph* hg,
   } 
 
   void LSTMParser::get_best_label(const vector<unsigned>& sent, const vector<unsigned>& sentPos, 
-                                    ComputationGraph* hg, int s0, int b0, vector<Expression>& word_rep, 
+                                    ComputationGraph* hg, const std::vector<string>& setOfActions,
+                                    int s0, int b0, vector<Expression>& word_rep, 
                                     Expression& act_rep, int sent_size, int dir, double *score, string *rel) {
     char prefix = (dir > 0 ? 'L' : 'R');
     //init graph connecting vector
@@ -907,10 +909,10 @@ vector<unsigned> LSTMParser::log_prob_parser(ComputationGraph* hg,
     // get list of possible actions for the current parser state
     vector<unsigned> current_valid_actions;
     for (auto a: possible_actions) {
-        //cerr << " " << corpus.actions[a]<< " ";
-        if (IsActionForbidden(corpus.actions[a], buffer.size(), stack.size(), sent.size() - 1, dir_graph, stacki, bufferi))
+        //cerr << " " << setOfActions[a]<< " ";
+        if (IsActionForbidden(setOfActions[a], buffer.size(), stack.size(), sent.size() - 1, dir_graph, stacki, bufferi))
             continue;
-        //cerr << " <" << corpus.actions[a] << "> ";
+        //cerr << " <" << setOfActions[a] << "> ";
         current_valid_actions.push_back(a);
     }
     // p_t = pbias + S * slstm + P * plstm + B * blstm + A * almst
@@ -925,7 +927,7 @@ vector<unsigned> LSTMParser::log_prob_parser(ComputationGraph* hg,
     double second_score = - DBL_MAX;
     string second_a = REL_NULL;
     for (unsigned i = 1; i < current_valid_actions.size(); ++i) {
-        const string& actionstr=corpus.actions[current_valid_actions[i]];
+        const string& actionstr=setOfActions[current_valid_actions[i]];
         const char  ac0 = actionstr[0];
         //cerr << actionstr << "-" << adist[current_valid_actions[i]] << endl;
         if (adist[current_valid_actions[i]] > second_score &&
@@ -939,8 +941,8 @@ vector<unsigned> LSTMParser::log_prob_parser(ComputationGraph* hg,
     *rel = second_a;
   }
 
-int LSTMParser::process_headless(vector<vector<string>>& hyp, vector<vector<string>>& cand, vector<Expression>& word_rep, 
-                                    Expression& act_rep, const vector<unsigned>& sent, const vector<unsigned>& sentPos){
+int LSTMParser::process_headless(vector<vector<string>>& hyp, vector<vector<string>>& cand, vector<Expression>& word_rep,
+                                    Expression& act_rep, const std::vector<string>& setOfActions, const vector<unsigned>& sent, const vector<unsigned>& sentPos){
     //cerr << "process headless" << endl;
     //const vector<string>& setOfActions = corpus.actions;
     int root = hyp.size() - 1;
@@ -973,8 +975,8 @@ int LSTMParser::process_headless(vector<vector<string>>& hyp, vector<vector<stri
 
                 map<int, double> scores;
                 map<int, string> rels;
-                process_headless_search_all(sent, sentPos, word_rep, act_rep, i, (int)(hyp.size()), 1, &scores, &rels);
-                process_headless_search_all(sent, sentPos, word_rep, act_rep, i, (int)(hyp.size()), -1, &scores, &rels);
+                process_headless_search_all(sent, sentPos, setOfActions, word_rep, act_rep, i, (int)(hyp.size()), 1, &scores, &rels);
+                process_headless_search_all(sent, sentPos, setOfActions, word_rep, act_rep, i, (int)(hyp.size()), -1, &scores, &rels);
                 if (root_num >0)
                     scores[root] = -DBL_MAX;
                 double opt_score = -DBL_MAX;
@@ -1080,7 +1082,7 @@ void LSTMParser::train(const std::string fname, const unsigned unk_strategy,
 
            //log_prob_parser(&hg,sentence,tsentence,sentencePos,actions,&right,cand);
            log_prob_parser(&hg,corpus.sentences[order[si]], tsentence, corpus.sentencesPos[order[si]], 
-           					corpus.correct_act_sent[order[si]], &right, cand);
+           					corpus.correct_act_sent[order[si]], corpus.actions, corpus.intToWords, &right, cand);
            double lp = as_scalar(hg.incremental_forward());
            if (lp < 0) {
              cerr << "Log prob < 0 on sentence " << order[si] << ": lp=" << lp << endl;
@@ -1124,13 +1126,14 @@ void LSTMParser::train(const std::string fname, const unsigned unk_strategy,
            std::vector<std::vector<string>> cand;
             //std::vector<unsigned> pred = log_prob_parser(&hg,sentence,tsentence,sentencePos,std::vector<unsigned>(),&right,cand);
             std::vector<unsigned> pred = log_prob_parser(&hg, corpus.sentencesDev[sii], tsentence, 
-            								corpus.sentencesPosDev[sii], std::vector<unsigned>(),&right,cand);
+            								corpus.sentencesPosDev[sii], std::vector<unsigned>(), corpus.actions, corpus.intToWords,
+                            &right,cand);
            double lp = 0;
            llh -= lp;
            trs += corpus.correct_act_sentDev[sii].size();
            //cerr << "start word:" << sii << corpus.intToWords[sentence[0]] << corpus.intToWords[sentence[1]] << endl;
-           std::vector<std::vector<string>> ref = compute_heads(corpus.sentencesDev[sii], corpus.correct_act_sentDev[sii]);
-           std::vector<std::vector<string>> hyp = compute_heads(corpus.sentencesDev[sii], pred);
+           std::vector<std::vector<string>> ref = compute_heads(corpus.sentencesDev[sii], corpus.correct_act_sentDev[sii], corpus.actions);
+           std::vector<std::vector<string>> hyp = compute_heads(corpus.sentencesDev[sii], pred, corpus.actions);
            //output_conll(sentence, corpus.intToWords, ref, hyp);
            //correct_heads += compute_correct(ref, hyp, sentence.size() - 1);
            //total_heads += sentence.size() - 1;
@@ -1194,8 +1197,8 @@ void LSTMParser::predict_dev() {
 
       {
       ComputationGraph cg;
-      pred = log_prob_parser(&cg, sentence, tsentence, sentencePos, std::vector<unsigned>(),
-                                                         &right, cand, &word_rep, &act_rep);
+      pred = log_prob_parser(&cg, sentence, tsentence, sentencePos, std::vector<unsigned>(), 
+                              corpus.actions, corpus.intToWords, &right, cand, &word_rep, &act_rep);
       }
       /*cerr << cand.size() << endl;
       for (unsigned i = 0; i < cand.size(); ++i){
@@ -1208,8 +1211,8 @@ void LSTMParser::predict_dev() {
       trs += actions.size();
       //map<int, string> rel_ref, rel_hyp;
       //cerr << "compute heads "<<endl;
-      std::vector<std::vector<string>> ref = compute_heads(sentence, actions);
-      std::vector<std::vector<string>> hyp = compute_heads(sentence, pred);
+      std::vector<std::vector<string>> ref = compute_heads(sentence, actions, corpus.actions);
+      std::vector<std::vector<string>> hyp = compute_heads(sentence, pred, corpus.actions);
       refs.push_back(ref);
       hyps.push_back(hyp);
 
@@ -1220,7 +1223,7 @@ void LSTMParser::predict_dev() {
         }
       }*/
 
-      if (process_headless(hyp, cand, word_rep, act_rep, sentence, sentencePos) > 0) {
+      if (process_headless(hyp, cand, word_rep, act_rep, corpus.actions, sentence, sentencePos) > 0) {
             miss_head++;
             cerr << corpus.intToWords[sentence[0]] << corpus.intToWords[sentence[1]]<< endl;
         }
@@ -1298,12 +1301,12 @@ void LSTMParser::predict(std::vector<std::vector<string>> &hyp, const std::vecto
       double right = 0;
       {
       ComputationGraph cg;
-      pred = log_prob_parser(&cg, sentence, tsentence, sentencePos, std::vector<unsigned>(),
-                                                         &right, cand, &word_rep, &act_rep);
+      pred = log_prob_parser(&cg, sentence, tsentence, sentencePos, std::vector<unsigned>(), 
+                              corpus.actions, corpus.intToWords, &right, cand, &word_rep, &act_rep);
       }
-      hyp = compute_heads(sentence, pred);
+      hyp = compute_heads(sentence, pred, corpus.actions);
       //cerr << "hyp length: " << hyp.size() << " " << hyp[0].size() << endl;
-      if (process_headless(hyp, cand, word_rep, act_rep, sentence, sentencePos) > 0) {
+      if (process_headless(hyp, cand, word_rep, act_rep, corpus.actions, sentence, sentencePos) > 0) {
             cerr << corpus.intToWords[sentence[0]] << corpus.intToWords[sentence[1]]<< endl;
       }
     //output_conll(sentence, sentencePos, sentenceUnkStr, hyp);

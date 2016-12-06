@@ -125,31 +125,32 @@ public:
 
   bool IsActionForbidden(const string& a, unsigned bsize, unsigned ssize, unsigned root, const std::vector<std::vector<std::string>> dir_graph,//const std::vector<bool>  dir_graph [], 
                                                 const std::vector<int>& stacki, const std::vector<int>& bufferi);
-  std::vector<std::vector<string>> compute_heads(const std::vector<unsigned>& sent, const std::vector<unsigned>& actions);
+  std::vector<std::vector<string>> compute_heads(const std::vector<unsigned>& sent, const std::vector<unsigned>& actions,
+                                                  const std::vector<string>& setOfActions);
   std::vector<unsigned> log_prob_parser(ComputationGraph* hg,
                      const std::vector<unsigned>& raw_sent,  // raw sentence
                      const std::vector<unsigned>& sent,  // sent with oovs replaced
                      const std::vector<unsigned>& sentPos,
                      const std::vector<unsigned>& correct_actions,
-                     //const std::vector<string>& setOfActions,
-                     //const map<unsigned, std::string>& intToWords,
+                     const std::vector<string>& setOfActions,
+                     const map<unsigned, std::string>& intToWords,
                      double *right, 
                      std::vector<std::vector<string>>& cand,
                      std::vector<Expression>* word_rep = NULL,
                      Expression * act_rep = NULL);
 
   int process_headless(std::vector<std::vector<string>>& hyp, std::vector<std::vector<string>>& cand, std::vector<Expression>& word_rep, 
-                                    Expression& act_rep, const std::vector<unsigned>& sent, const std::vector<unsigned>& sentPos);
+                                    Expression& act_rep, const std::vector<string>& setOfActions, const std::vector<unsigned>& sent, const std::vector<unsigned>& sentPos);
 
   void process_headless_search_all(const std::vector<unsigned>& sent, const std::vector<unsigned>& sentPos, 
-                                                        //const std::vector<string>& setOfActions, 
+                                                        const std::vector<string>& setOfActions, 
                                                         std::vector<Expression>& word_rep, 
                                                         Expression& act_rep, int n, int sent_len, int dir, map<int, double>* scores, 
                                                         map<int, string>* rels);
 
   void get_best_label(const std::vector<unsigned>& sent, const std::vector<unsigned>& sentPos, 
                                     ComputationGraph* hg, 
-                                    //const std::vector<string>& setOfActions, 
+                                    const std::vector<string>& setOfActions, 
                                     int s0, int b0, std::vector<Expression>& word_rep, Expression& act_rep, int sent_size, 
                                     int dir, double *score, string *rel);
 
